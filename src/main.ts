@@ -1,143 +1,134 @@
-abstract class Shape {
-  abstract render(): void;
-  abstract move(dx: number, dy: number): void;
-  abstract scale(factor: number): void;
-}
+// Types
 
-class Point {
-  constructor(public x: number, public y: number) {}
-}
+type Point = { x: number, y: number };
 
-class Circle extends Shape {
-  constructor(private center: Point, private radius: number) {
-    super();
+type Shape =
+  | { type: 'circle', center: Point, radius: number }
+  | { type: 'rectangle', topLeft: Point, width: number, height: number }
+  | { type: 'group', shapes: Shape[] };
+
+type Layer = {
+  id: string;
+  shapes: Shape[];
+  visible: boolean;
+};
+
+type Drawing = {
+  layers: Layer[];
+};
+
+// Operations
+
+const createCircle = (center: Point, radius: number): Shape => ({
+  type: 'circle',
+  center,
+  radius
+});
+
+const createRectangle = (topLeft: Point, width: number, height: number): Shape => ({
+  type: 'rectangle',
+  topLeft,
+  width,
+  height
+});
+
+const createGroup = (shapes: Shape[]): Shape => ({
+  type: 'group',
+  shapes
+});
+
+const renderShape = (shape: Shape): void => {
+  switch (shape.type) {
+    case 'circle':
+      console.log(`Rendering circle at (${shape.center.x}, ${shape.center.y}) with radius ${shape.radius}`);
+      break;
+    case 'rectangle':
+      console.log(`Rendering rectangle at (${shape.topLeft.x}, ${shape.topLeft.y}) with width ${shape.width} and height ${shape.height}`);
+      break;
+    case 'group':
+      shape.shapes.forEach(renderShape);
+      break;
   }
+};
 
-  render(): void {
-    console.log(`Rendering circle at (${this.center.x}, ${this.center.y}) with radius ${this.radius}`);
+const renderLayer = (layer: Layer): void => {
+  if (layer.visible) {
+    layer.shapes.forEach(renderShape);
   }
+};
 
-  move(dx: number, dy: number): void {
-    this.center = { x: this.center.x + dx, y: this.center.y + dy };
+const renderDrawing = (drawing: Drawing): void => {
+  drawing.layers.forEach(renderLayer);
+};
+
+const moveShape = (shape: Shape, dx: number, dy: number): Shape => {
+  switch (shape.type) {
+    case 'circle':
+      return { ...shape, center: { x: shape.center.x + dx, y: shape.center.y + dy } };
+    case 'rectangle':
+      return { ...shape, topLeft: { x: shape.topLeft.x + dx, y: shape.topLeft.y + dy } };
+    case 'group':
+      return { ...shape, shapes: shape.shapes.map(s => moveShape(s, dx, dy)) };
   }
+};
 
-  scale(factor: number): void {
-    this.radius *= factor;
+const scaleShape = (shape: Shape, factor: number): Shape => {
+  switch (shape.type) {
+    case 'circle':
+      return { ...shape, radius: shape.radius * factor };
+    case 'rectangle':
+      return { ...shape, width: shape.width * factor, height: shape.height * factor };
+    case 'group':
+      return { ...shape, shapes: shape.shapes.map(s => scaleShape(s, factor)) };
   }
-}
+};
 
-class Rectangle extends Shape {
-  constructor(private topLeft: Point, private width: number, private height: number) {
-    super();
-  }
 
-  render(): void {
-    console.log(`Rendering rectangle at (${this.topLeft.x}, ${this.topLeft.y}) with width ${this.width} and height ${this.height}`);
-  }
 
-  move(dx: number, dy: number): void {
-    this.topLeft = { x: this.topLeft.x + dx, y: this.topLeft.y + dy };
-  }
+// Usage
 
-  scale(factor: number): void {
-    this.width *= factor;
-    this.height *= factor;
-  }
-}
+// Create a drawing with layers and shapes
+const layer1: Layer = {
+  id: 'layer1',
+  shapes: [
+    createCircle({ x: 50, y: 50 }, 20),
+    createRectangle({ x: 10, y: 10 }, 30, 40)
+  ],
+  visible: true
+};
 
-class Group extends Shape {
-  private shapes: Shape[] = [];
+const layer2: Layer = {
+  id: 'layer2',
+  shapes: [
+    createGroup([
+      createCircle({ x: 100, y: 100 }, 10),
+      createRectangle({ x: 120, y: 120 }, 20, 30)
+    ])
+  ],
+  visible: true
+};
 
-  addShape(shape: Shape): void {
-    this.shapes.push(shape);
-  }
+const drawing: Drawing = {
+  layers: [layer1, layer2]
+};
 
-  render(): void {
-    this.shapes.forEach(shape => shape.render());
-  }
+// Render the drawing
+renderDrawing(drawing);
 
-  move(dx: number, dy: number): void {
-    this.shapes.forEach(shape => shape.move(dx, dy));
-  }
+// Apply transformations
+const movedDrawing: Drawing = {
+  layers: drawing.layers.map(layer => ({
+    ...layer,
+    shapes: layer.shapes.map(shape => moveShape(shape, 10, 10))
+  }))
+};
 
-  scale(factor: number): void {
-    this.shapes.forEach(shape => shape.scale(factor));
-  }
-}
+const scaledDrawing: Drawing = {
+  layers: movedDrawing.layers.map(layer => ({
+    ...layer,
+    shapes: layer.shapes.map(shape => scaleShape(shape, 2))
+  }))
+};
 
-class Layer {
-  private shapes: Shape[] = [];
-  public visible: boolean = true;
-
-  addShape(shape: Shape): void {
-    this.shapes.push(shape);
-  }
-
-  render(): void {
-    if (this.visible) {
-      this.shapes.forEach(shape => shape.render());
-    }
-  }
-
-  move(dx: number, dy: number): void {
-    this.shapes.forEach(shape => shape.move(dx, dy));
-  }
-
-  scale(factor: number): void {
-    this.shapes.forEach(shape => shape.scale(factor));
-  }
-}
-
-class Drawing {
-  private layers: Layer[] = [];
-
-  addLayer(layer: Layer): void {
-    this.layers.push(layer);
-  }
-
-  render(): void {
-    this.layers.forEach(layer => layer.render());
-  }
-
-  moveLayer(layerIndex: number, dx: number, dy: number): void {
-    const layer = this.layers[layerIndex];
-    if (layer) {
-      layer.move(dx, dy);
-    }
-  }
-
-  scaleLayer(layerIndex: number, factor: number): void {
-    const layer = this.layers[layerIndex];
-    if (layer) {
-      layer.scale(factor);
-    }
-  }
-}
-
-// Using the Graphics Classes
-
-const drawing = new Drawing();
-
-const layer1 = new Layer();
-const circle = new Circle({ x: 50, y: 50 }, 20);
-const rectangle = new Rectangle({ x: 10, y: 10 }, 30, 40);
-
-layer1.addShape(circle);
-layer1.addShape(rectangle);
-
-const layer2 = new Layer();
-const group = new Group();
-group.addShape(new Circle({ x: 100, y: 100 }, 10));
-group.addShape(new Rectangle({ x: 120, y: 120 }, 20, 30));
-
-layer2.addShape(group);
-
-drawing.addLayer(layer1);
-drawing.addLayer(layer2);
-
-drawing.render();
-
-drawing.moveLayer(0, 10, 10);
-drawing.scaleLayer(1, 2);
-
-drawing.render();
+// Render the transformed drawing
+renderDrawing(scaledDrawing);
